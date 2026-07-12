@@ -67,6 +67,8 @@ interface StoreState {
   addFuelLog: (f: Omit<FuelLog, "id">) => void;
   addExpense: (e: Omit<Expense, "id">) => void;
 
+  theme: "light" | "dark";
+  toggleTheme: () => void;
   updateSettings: (s: Partial<Settings>) => void;
 }
 
@@ -89,6 +91,23 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [expenses, setExpenses] = useState<Expense[]>(seedExpenses);
   const [settings, setSettings] = useState<Settings>(seedSettings);
   const [tripCounter, setTripCounter] = useState(1005);
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    const local = localStorage.getItem("theme");
+    if (local === "light" || local === "dark") return local;
+    return "dark";
+  });
+
+  React.useEffect(() => {
+    const root = window.document.documentElement;
+    if (theme === "dark") {
+      root.classList.add("dark");
+    } else {
+      root.classList.remove("dark");
+    }
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
 
   const setVehicleStatus = (id: string, status: VehicleStatus) =>
     setVehicles((prev) => prev.map((v) => (v.id === id ? { ...v, status } : v)));
@@ -106,6 +125,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       fuelLogs,
       expenses,
       settings,
+      theme,
+      toggleTheme,
 
       login: (email, password) => {
         const u = users.find((x) => x.email.toLowerCase() === email.trim().toLowerCase());
@@ -339,7 +360,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         toast.success("Settings saved.");
       },
     };
-  }, [currentUser, users, vehicles, drivers, trips, maintenance, fuelLogs, expenses, settings, tripCounter]);
+  }, [currentUser, users, vehicles, drivers, trips, maintenance, fuelLogs, expenses, settings, tripCounter, theme]);
 
   return <StoreContext.Provider value={api}>{children}</StoreContext.Provider>;
 }
