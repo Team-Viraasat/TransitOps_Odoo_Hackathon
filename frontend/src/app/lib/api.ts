@@ -1,4 +1,12 @@
-const BASE = "http://localhost:4000";
+declare global {
+  interface Window {
+    __TRANSITOPS_API_BASE_URL__?: string;
+  }
+}
+
+const RUNTIME_BASE = typeof window !== "undefined" ? window.__TRANSITOPS_API_BASE_URL__ : undefined;
+const ENV_BASE = import.meta.env.VITE_API_BASE_URL as string | undefined;
+const BASE = (RUNTIME_BASE || ENV_BASE || "http://localhost:4000").replace(/\/+$/, "");
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -10,10 +18,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(body.error || body.message || res.statusText);
   }
-  if (res.headers.get("content-type")?.includes("text/csv")) {
+  if (res.status === 204 || res.status === 205) {
+    return undefined as T;
+  }
+
+  const contentType = res.headers.get("content-type")?.toLowerCase() ?? "";
+  if (contentType.includes("text/csv")) {
     return (await res.text()) as unknown as T;
   }
-  return res.json();
+  if (contentType.includes("application/json") || contentType.includes("+json")) {
+    return res.json();
+  }
+
+  const body = await res.text();
+  return (body.length ? body : undefined) as T;
 }
 
 // ── Auth ──────────────────────────────────────────

@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { toast } from "sonner";
 import type {
   User,
+  RoleName,
   Vehicle,
   Driver,
   Trip,
@@ -25,7 +26,7 @@ interface StoreState {
   settings: Settings;
   loading: boolean;
 
-  login: (email: string, password: string) => void;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
 
   addVehicle: (v: Omit<Vehicle, "id" | "status">) => void;
@@ -61,6 +62,18 @@ interface StoreState {
 }
 
 const StoreContext = createContext<StoreState | null>(null);
+const ALLOWED_USER_ROLES: ReadonlySet<RoleName> = new Set([
+  "Fleet Manager",
+  "Dispatcher",
+  "Safety Officer",
+  "Financial Analyst",
+  "Admin",
+]);
+const ALLOWED_USER_STATUSES: ReadonlySet<User["status"]> = new Set([
+  "Active",
+  "Locked",
+  "Disabled",
+]);
 
 export const useStore = () => {
   const ctx = useContext(StoreContext);
@@ -94,13 +107,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
 
   // Map API user response to our User type
-  const mapUser = (u: { id: string; name: string; email: string; role: string; status: string }): User => ({
-    id: u.id,
-    name: u.name,
-    email: u.email,
-    role: u.role as User["role"],
-    status: u.status as User["status"],
-  });
+  const mapUser = (u: { id: string; name: string; email: string; role: string; status: string }): User => {
+    if (!ALLOWED_USER_ROLES.has(u.role as RoleName) || !ALLOWED_USER_STATUSES.has(u.status as User["status"])) {
+      throw new Error("Invalid user role or status received from server.");
+    }
+    return {
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role as User["role"],
+      status: u.status as User["status"],
+    };
+  };
 
   // Fetch all data from API
   const fetchAll = useCallback(async () => {
@@ -134,7 +152,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         return fetchAll();
       })
       .catch(() => {
-        // Not authenticated
+        setCurrentUser(null);
+        api.auth.logout();
       })
       .finally(() => setLoading(false));
   }, [fetchAll]);
@@ -149,7 +168,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
     return {
       currentUser,
-      users: [], // not used in screens except Auth which uses seedUsers
+      users: [],
       vehicles,
       drivers,
       trips,
@@ -161,16 +180,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       theme,
       toggleTheme,
 
-      login: (email, password) => {
-        api.auth.login(email, password)
-          .then(({ user }) => {
-            setCurrentUser(mapUser(user));
-            toast.success(`Welcome back, ${user.name}`);
-            fetchAll();
-          })
-          .catch((err) => {
-            toast.error(err.message || "Invalid credentials");
-          });
+      login: async (email, password) => {
+        try {
+          const { user } = await api.auth.login(email, password);
+          const mappedUser = mapUser(user);
+          setCurrentUser(mappedUser);
+          toast.success(`Welcome back, ${mappedUser.name}`);
+          await fetchAll();
+          return true;
+        } catch (err: any) {
+          setCurrentUser(null);
+          await api.auth.logout();
+          toast.error(err?.message || "Invalid credentials");
+          return false;
+        }
       },
 
       logout: () => {

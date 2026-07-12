@@ -34,8 +34,12 @@ export function Auth() {
     setIsTransitioning(true);
 
     // Defer actual login to let the transition animate
-    setTimeout(() => {
-      login(email, password);
+    setTimeout(async () => {
+      const success = await login(email, password);
+      if (!success) {
+        setError("Sign in failed. Please check your credentials and try again.");
+        setIsTransitioning(false);
+      }
     }, 2000);
   };
 
