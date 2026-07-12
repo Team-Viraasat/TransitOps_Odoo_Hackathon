@@ -1,0 +1,150 @@
+import React, { useState } from "react";
+import {
+  LayoutDashboard,
+  Truck,
+  Users,
+  Route,
+  Wrench,
+  Fuel,
+  BarChart3,
+  Settings as SettingsIcon,
+  Search,
+  LogOut,
+  Menu,
+  ShieldCheck,
+} from "lucide-react";
+import { useStore } from "../../lib/store";
+import { canView, type ModuleKey } from "../../lib/rbac";
+
+export type ScreenKey =
+  | "dashboard"
+  | "vehicles"
+  | "drivers"
+  | "trips"
+  | "maintenance"
+  | "expenses"
+  | "analytics"
+  | "settings";
+
+const NAV: { key: ScreenKey; label: string; icon: React.ReactNode; module: ModuleKey }[] = [
+  { key: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} />, module: "Dashboard" },
+  { key: "vehicles", label: "Vehicle Registry", icon: <Truck size={18} />, module: "Vehicles" },
+  { key: "drivers", label: "Drivers & Safety", icon: <Users size={18} />, module: "Drivers" },
+  { key: "trips", label: "Trip Dispatcher", icon: <Route size={18} />, module: "Trips" },
+  { key: "maintenance", label: "Maintenance", icon: <Wrench size={18} />, module: "Maintenance" },
+  { key: "expenses", label: "Fuel & Expenses", icon: <Fuel size={18} />, module: "Fuel Logs" },
+  { key: "analytics", label: "Reports & Analytics", icon: <BarChart3 size={18} />, module: "Analytics" },
+  { key: "settings", label: "Settings & RBAC", icon: <SettingsIcon size={18} />, module: "Settings/RBAC" },
+];
+
+export function Shell({
+  active,
+  onNavigate,
+  search,
+  onSearch,
+  children,
+}: {
+  active: ScreenKey;
+  onNavigate: (s: ScreenKey) => void;
+  search: string;
+  onSearch: (v: string) => void;
+  children: React.ReactNode;
+}) {
+  const { currentUser, logout } = useStore();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const role = currentUser!.role;
+  const visibleNav = NAV.filter((n) => canView(role, n.module));
+
+  const initials = currentUser!.name
+    .split(" ")
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("");
+
+  const SidebarInner = (
+    <>
+      <div className="flex items-center gap-2.5 px-5 py-4">
+        <div className="flex size-8 items-center justify-center rounded-lg bg-to-orange text-black">
+          <Truck size={18} />
+        </div>
+        <div>
+          <div className="text-to-text">TransitOps</div>
+          <div className="text-[11px] text-to-muted">Smart Transport Ops</div>
+        </div>
+      </div>
+      <nav className="flex-1 space-y-1 px-3 py-2">
+        {visibleNav.map((n) => {
+          const isActive = active === n.key;
+          return (
+            <button
+              key={n.key}
+              onClick={() => {
+                onNavigate(n.key);
+                setMobileOpen(false);
+              }}
+              className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                isActive
+                  ? "border border-to-blue/40 bg-to-blue/10 text-to-text"
+                  : "border border-transparent text-to-muted hover:bg-to-panel2 hover:text-to-text"
+              }`}
+            >
+              <span className={isActive ? "text-to-blue" : ""}>{n.icon}</span>
+              {n.label}
+            </button>
+          );
+        })}
+      </nav>
+      <div className="border-t border-to-border p-3">
+        <div className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs text-to-muted">
+          <ShieldCheck size={16} className="text-to-green" />
+          Role-based access active
+        </div>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="flex h-screen w-full overflow-hidden bg-to-bg text-to-text">
+      {/* Desktop sidebar */}
+      <aside className="hidden w-64 shrink-0 flex-col border-r border-to-border bg-to-panel lg:flex">{SidebarInner}</aside>
+
+      {/* Mobile drawer */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setMobileOpen(false)} />
+          <aside className="absolute left-0 top-0 flex h-full w-64 flex-col border-r border-to-border bg-to-panel">{SidebarInner}</aside>
+        </div>
+      )}
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Topbar */}
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-to-border bg-to-panel px-4">
+          <button className="text-to-muted lg:hidden" onClick={() => setMobileOpen(true)}>
+            <Menu size={20} />
+          </button>
+          <div className="relative flex-1 max-w-md">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-to-muted" />
+            <input
+              value={search}
+              onChange={(e) => onSearch(e.target.value)}
+              placeholder="Search vehicles, drivers, trips…"
+              className="w-full rounded-lg border border-to-border bg-to-bg py-2 pl-9 pr-3 text-sm text-to-text placeholder:text-to-muted/60 outline-none focus:border-to-blue"
+            />
+          </div>
+          <div className="ml-auto flex items-center gap-3">
+            <div className="hidden text-right sm:block">
+              <div className="text-sm leading-tight">{currentUser!.name}</div>
+              <div className="text-[11px] leading-tight text-to-orange">{role}</div>
+            </div>
+            <div className="flex size-9 items-center justify-center rounded-full bg-to-blue/20 text-sm text-to-blue">{initials}</div>
+            <button onClick={logout} className="text-to-muted hover:text-to-red" title="Log out">
+              <LogOut size={18} />
+            </button>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
+      </div>
+    </div>
+  );
+}
