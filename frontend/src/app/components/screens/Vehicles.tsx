@@ -5,6 +5,7 @@ import { canWrite } from "../../lib/rbac";
 import { fmtMoney } from "../../lib/metrics";
 import type { Vehicle, VehicleType } from "../../lib/types";
 import { Button, Field, Input, Select, Panel, PageHeader, StatusBadge, Modal, EmptyState } from "../ui/primitives";
+import { Combobox } from "../ui/combobox";
 
 const TYPES: VehicleType[] = ["Van", "Truck", "Mini", "Container", "Other"];
 
@@ -52,14 +53,24 @@ export function Vehicles({ globalSearch }: { globalSearch: string }) {
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-to-muted" />
             <Input value={local} onChange={(e) => setLocal(e.target.value)} placeholder="Search registration or model" className="pl-9" />
           </div>
-          <Select value={type} onChange={(e) => setType(e.target.value)} className="w-auto">
-            <option value="">All Types</option>
-            {TYPES.map((t) => <option key={t}>{t}</option>)}
-          </Select>
-          <Select value={status} onChange={(e) => setStatus(e.target.value)} className="w-auto">
-            <option value="">All Statuses</option>
-            {["Available", "On Trip", "In Shop", "Retired"].map((s) => <option key={s}>{s}</option>)}
-          </Select>
+          <Combobox
+            value={type}
+            onChange={setType}
+            options={[
+              { label: "All Types", value: "" },
+              ...TYPES.map(t => ({ label: t, value: t }))
+            ]}
+            className="w-auto"
+          />
+          <Combobox
+            value={status}
+            onChange={setStatus}
+            options={[
+              { label: "All Statuses", value: "" },
+              ...["Available", "On Trip", "In Shop", "Retired"].map(s => ({ label: s, value: s }))
+            ]}
+            className="w-auto"
+          />
         </div>
       </Panel>
 
@@ -168,9 +179,11 @@ function VehicleForm({
         <Field label="Registration Number"><Input value={reg} onChange={(e) => setReg(e.target.value.toUpperCase())} placeholder="MH12AB1234" /></Field>
         <Field label="Name / Model"><Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="Tata Ace" /></Field>
         <Field label="Type">
-          <Select value={type} onChange={(e) => setType(e.target.value as VehicleType)}>
-            {TYPES.map((t) => <option key={t}>{t}</option>)}
-          </Select>
+          <Combobox
+            value={type}
+            onChange={(v) => setType(v as VehicleType)}
+            options={TYPES.map(t => ({ label: t, value: t }))}
+          />
         </Field>
         <Field label="Max Load (kg)"><Input type="number" value={maxLoad} onChange={(e) => setMaxLoad(e.target.value)} /></Field>
         <Field label="Odometer (km)"><Input type="number" value={odo} onChange={(e) => setOdo(e.target.value)} /></Field>

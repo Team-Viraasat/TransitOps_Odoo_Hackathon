@@ -5,6 +5,7 @@ import { canWrite } from "../../lib/rbac";
 import { fmtMoney } from "../../lib/metrics";
 import type { Trip } from "../../lib/types";
 import { Button, Field, Input, Select, Panel, PageHeader, StatusBadge, Modal, EmptyState } from "../ui/primitives";
+import { Combobox } from "../ui/combobox";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const isExpired = (d: string) => new Date(d) < new Date(today());
@@ -88,20 +89,26 @@ export function Trips() {
                   <Field label="Destination"><Input value={dest} onChange={(e) => setDest(e.target.value)} placeholder="Pune" /></Field>
                 </div>
                 <Field label="Vehicle (available only)">
-                  <Select value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
-                    <option value="">Select vehicle</option>
-                    {availableVehicles.map((v) => (
-                      <option key={v.id} value={v.id}>{v.registrationNumber} · {v.nameModel} ({v.maxLoadKg}kg)</option>
-                    ))}
-                  </Select>
+                  <Combobox
+                    value={vehicleId}
+                    onChange={setVehicleId}
+                    placeholder="Select vehicle"
+                    options={availableVehicles.map((v) => ({
+                      value: v.id,
+                      label: `${v.registrationNumber} · ${v.nameModel} (${v.maxLoadKg}kg)`
+                    }))}
+                  />
                 </Field>
                 <Field label="Driver (available, valid license)">
-                  <Select value={driverId} onChange={(e) => setDriverId(e.target.value)}>
-                    <option value="">Select driver</option>
-                    {availableDrivers.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name} · {d.licenseCategory}</option>
-                    ))}
-                  </Select>
+                  <Combobox
+                    value={driverId}
+                    onChange={setDriverId}
+                    placeholder="Select driver"
+                    options={availableDrivers.map((d) => ({
+                      value: d.id,
+                      label: `${d.name} · ${d.licenseCategory}`
+                    }))}
+                  />
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Cargo Weight (kg)"><Input type="number" value={cargo} onChange={(e) => setCargo(e.target.value)} /></Field>

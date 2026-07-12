@@ -5,6 +5,7 @@ import { canWrite } from "../../lib/rbac";
 import { fmtMoney, operationalCost } from "../../lib/metrics";
 import type { ExpenseType } from "../../lib/types";
 import { Button, Field, Input, Select, Panel, PageHeader, KpiCard, Modal, EmptyState } from "../ui/primitives";
+import { Combobox } from "../ui/combobox";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -136,10 +137,12 @@ function FuelForm({ vehicles, onClose, onSubmit }: { vehicles: { id: string; reg
   return (
     <form onSubmit={submit} className="space-y-4">
       <Field label="Vehicle">
-        <Select value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
-          <option value="">Select vehicle</option>
-          {vehicles.map((v) => <option key={v.id} value={v.id}>{v.registrationNumber}</option>)}
-        </Select>
+        <Combobox
+          value={vehicleId}
+          onChange={setVehicleId}
+          placeholder="Select vehicle"
+          options={vehicles.map(v => ({ label: v.registrationNumber, value: v.id }))}
+        />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Liters"><Input type="number" value={liters} onChange={(e) => setLiters(e.target.value)} /></Field>
@@ -173,25 +176,37 @@ function ExpenseForm({ vehicles, trips, onClose, onSubmit }: { vehicles: { id: s
     <form onSubmit={submit} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <Field label="Type">
-          <Select value={type} onChange={(e) => setType(e.target.value as ExpenseType)}>
-            {(["Toll", "Maintenance", "Misc"] as ExpenseType[]).map((t) => <option key={t}>{t}</option>)}
-          </Select>
+          <Combobox
+            value={type}
+            onChange={(v) => setType(v as ExpenseType)}
+            options={(["Toll", "Maintenance", "Misc"] as ExpenseType[]).map(t => ({ label: t, value: t }))}
+          />
         </Field>
         <Field label="Amount (₹)"><Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
       </div>
       <Field label="Description"><Input value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Vehicle (optional)">
-          <Select value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
-            <option value="">None</option>
-            {vehicles.map((v) => <option key={v.id} value={v.id}>{v.registrationNumber}</option>)}
-          </Select>
+          <Combobox
+            value={vehicleId}
+            onChange={setVehicleId}
+            placeholder="None"
+            options={[
+              { label: "None", value: "" },
+              ...vehicles.map(v => ({ label: v.registrationNumber, value: v.id }))
+            ]}
+          />
         </Field>
         <Field label="Trip (optional)">
-          <Select value={tripId} onChange={(e) => setTripId(e.target.value)}>
-            <option value="">None</option>
-            {trips.map((t) => <option key={t.id} value={t.id}>{t.tripCode}</option>)}
-          </Select>
+          <Combobox
+            value={tripId}
+            onChange={setTripId}
+            placeholder="None"
+            options={[
+              { label: "None", value: "" },
+              ...trips.map(t => ({ label: t.tripCode, value: t.id }))
+            ]}
+          />
         </Field>
       </div>
       <Field label="Date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>

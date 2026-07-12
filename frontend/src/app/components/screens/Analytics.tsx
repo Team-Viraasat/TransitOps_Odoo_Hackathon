@@ -1,15 +1,19 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useId } from "react";
 import { Download, Gauge, TrendingUp, Fuel, Coins } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import { toast } from "sonner";
 import { useStore } from "../../lib/store";
 import { computeKpis, operationalCost, fuelEfficiency, vehicleRoi, fmtMoney } from "../../lib/metrics";
 import { KpiCard, Panel, PageHeader, Button, EmptyState } from "../ui/primitives";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
+import { Badge } from "../ui/badge";
+import { cn } from "../ui/utils";
 
 const axisStyle = { fontSize: 11, fill: "#98a2b3" };
 const tooltipStyle = { background: "#1b222b", border: "1px solid #2a313a", borderRadius: 8, color: "#f5f7fa", fontSize: 12 };
 
 export function Analytics() {
+  const id = useId();
   const { vehicles, drivers, trips, fuelLogs, maintenance, expenses } = useStore();
 
   const kpis = useMemo(() => computeKpis(vehicles, drivers, trips), [vehicles, drivers, trips]);
@@ -107,29 +111,57 @@ export function Analytics() {
         {roiRows.length === 0 ? (
           <EmptyState message="No active vehicles." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs text-to-muted">
-                  <th className="px-4 py-2.5">Vehicle</th>
-                  <th className="px-4 py-2.5">Revenue</th>
-                  <th className="px-4 py-2.5">Operational Cost</th>
-                  <th className="px-4 py-2.5">Acquisition</th>
-                  <th className="px-4 py-2.5">ROI</th>
-                </tr>
-              </thead>
-              <tbody>
-                {roiRows.map((r) => (
-                  <tr key={r.vehicle.id} className="border-t border-to-border">
-                    <td className="px-4 py-2.5 font-mono">{r.vehicle.registrationNumber}</td>
-                    <td className="px-4 py-2.5 text-to-muted">{fmtMoney(r.revenue)}</td>
-                    <td className="px-4 py-2.5 text-to-muted">{fmtMoney(r.cost)}</td>
-                    <td className="px-4 py-2.5 text-to-muted">{fmtMoney(r.vehicle.acquisitionCost)}</td>
-                    <td className={`px-4 py-2.5 ${r.roi >= 0 ? "text-to-green" : "text-to-red"}`}>{r.roi.toFixed(1)}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="w-full">
+            <div className="overflow-hidden rounded-xl border">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50 shadow-[inset_0px_1px_2px_0px_rgba(255,255,255,1),inset_0px_-1px_4px_0px_rgba(0,0,0,0.05)] dark:shadow-[inset_0px_1px_2px_0px_rgba(255,255,255,0.1),inset_0px_-1px_2px_0px_rgba(0,0,0,0.02)]">
+                    <TableHead className="pl-4">Vehicle</TableHead>
+                    <TableHead>Revenue</TableHead>
+                    <TableHead>Operational Cost</TableHead>
+                    <TableHead>Acquisition</TableHead>
+                    <TableHead className="text-right">ROI</TableHead>
+                  </TableRow>
+                </TableHeader>
+
+                <TableBody>
+                  {roiRows.map((r) => (
+                    <TableRow
+                      key={r.vehicle.id}
+                    >
+                      <TableCell className="pl-4">
+                        <div className="flex flex-col">
+                          <span className="font-medium">{r.vehicle.registrationNumber}</span>
+                          <span className="text-muted-foreground text-xs">
+                            {r.vehicle.nameModel}
+                          </span>
+                        </div>
+                      </TableCell>
+
+                      <TableCell>{fmtMoney(r.revenue)}</TableCell>
+
+                      <TableCell>{fmtMoney(r.cost)}</TableCell>
+
+                      <TableCell>{fmtMoney(r.vehicle.acquisitionCost)}</TableCell>
+
+                      <TableCell className="text-right">
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            r.roi >= 0
+                              ? "bg-green-600/10 text-green-600 border-green-600/20 dark:bg-green-400/10 dark:text-green-400 dark:border-green-400/20"
+                              : "bg-red-600/10 text-red-600 border-red-600/20 dark:bg-red-400/10 dark:text-red-400 dark:border-red-400/20",
+                            'rounded-sm shadow-[inset_0px_1px_2px_0px_rgba(255,255,255,1),inset_0px_-1px_2px_0px_rgba(0,0,0,0.05)] dark:shadow-[inset_0px_1px_2px_0px_rgba(255,255,255,0.25),inset_0px_-1px_2px_0px_rgba(0,0,0,0.7)]',
+                          )}
+                        >
+                          {r.roi.toFixed(1)}%
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         )}
       </Panel>

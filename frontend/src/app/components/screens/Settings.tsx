@@ -3,6 +3,7 @@ import { useStore } from "../../lib/store";
 import { PERMISSION_MATRIX, type ModuleKey, type Access } from "../../lib/rbac";
 import type { RoleName } from "../../lib/types";
 import { Button, Field, Input, Select, Panel, PageHeader } from "../ui/primitives";
+import { Combobox } from "../ui/combobox";
 
 const ROLES: RoleName[] = ["Fleet Manager", "Dispatcher", "Safety Officer", "Financial Analyst", "Admin"];
 
@@ -32,14 +33,18 @@ export function Settings() {
           <div className="space-y-3">
             <Field label="Depot Name"><Input value={depotName} onChange={(e) => setDepotName(e.target.value)} /></Field>
             <Field label="Currency">
-              <Select value={currency} onChange={(e) => setCurrency(e.target.value)}>
-                {["INR", "USD", "EUR", "GBP", "AED"].map((c) => <option key={c}>{c}</option>)}
-              </Select>
+              <Combobox
+                value={currency}
+                onChange={setCurrency}
+                options={["INR", "USD", "EUR", "GBP", "AED"].map(c => ({ label: c, value: c }))}
+              />
             </Field>
             <Field label="Distance Unit">
-              <Select value={distanceUnit} onChange={(e) => setDistanceUnit(e.target.value)}>
-                {["km", "mi"].map((u) => <option key={u}>{u}</option>)}
-              </Select>
+              <Combobox
+                value={distanceUnit}
+                onChange={setDistanceUnit}
+                options={["km", "mi"].map(u => ({ label: u, value: u }))}
+              />
             </Field>
             <Button variant="primary" className="w-full" onClick={() => updateSettings({ depotName, currency, distanceUnit })}>
               Save Settings

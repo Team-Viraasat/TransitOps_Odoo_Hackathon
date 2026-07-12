@@ -4,6 +4,7 @@ import { useStore } from "../../lib/store";
 import { canWrite } from "../../lib/rbac";
 import { fmtMoney } from "../../lib/metrics";
 import { Button, Field, Input, Select, Panel, PageHeader, StatusBadge, Modal, EmptyState } from "../ui/primitives";
+import { Combobox } from "../ui/combobox";
 
 export function Maintenance() {
   const { maintenance, vehicles, addMaintenance, closeMaintenance, currentUser } = useStore();
@@ -112,10 +113,12 @@ function MaintenanceForm({
         <Wrench size={14} /> Vehicle will move to In Shop and disappear from dispatch selection.
       </div>
       <Field label="Vehicle">
-        <Select value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
-          <option value="">Select vehicle</option>
-          {vehicles.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
-        </Select>
+        <Combobox
+          value={vehicleId}
+          onChange={setVehicleId}
+          placeholder="Select vehicle"
+          options={vehicles.map(v => ({ label: v.label, value: v.id }))}
+        />
       </Field>
       <Field label="Service Type"><Input value={serviceType} onChange={(e) => setServiceType(e.target.value)} placeholder="Engine Overhaul" /></Field>
       <Field label="Description"><Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Details of the work" /></Field>

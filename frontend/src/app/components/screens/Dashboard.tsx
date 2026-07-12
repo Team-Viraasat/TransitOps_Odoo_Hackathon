@@ -4,6 +4,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recha
 import { useStore } from "../../lib/store";
 import { computeKpis, vehicleStatusBreakdown, STATUS_COLORS } from "../../lib/metrics";
 import { KpiCard, Panel, PageHeader, StatusBadge, Select, EmptyState } from "../ui/primitives";
+import { Combobox } from "../ui/combobox";
 
 export function Dashboard() {
   const { vehicles, drivers, trips } = useStore();
@@ -34,24 +35,33 @@ export function Dashboard() {
         subtitle="Live fleet status computed from current records."
         action={
           <div className="flex flex-wrap gap-2">
-            <Select value={type} onChange={(e) => setType(e.target.value)} className="w-auto">
-              <option value="">All Types</option>
-              {["Van", "Truck", "Mini", "Container", "Other"].map((t) => (
-                <option key={t}>{t}</option>
-              ))}
-            </Select>
-            <Select value={status} onChange={(e) => setStatus(e.target.value)} className="w-auto">
-              <option value="">All Statuses</option>
-              {["Available", "On Trip", "In Shop", "Retired"].map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </Select>
-            <Select value={region} onChange={(e) => setRegion(e.target.value)} className="w-auto">
-              <option value="">All Regions</option>
-              {regions.map((r) => (
-                <option key={r}>{r}</option>
-              ))}
-            </Select>
+            <Combobox
+              value={type}
+              onChange={setType}
+              options={[
+                { label: "All Types", value: "" },
+                ...["Van", "Truck", "Mini", "Container", "Other"].map(t => ({ label: t, value: t }))
+              ]}
+              className="w-auto"
+            />
+            <Combobox
+              value={status}
+              onChange={setStatus}
+              options={[
+                { label: "All Statuses", value: "" },
+                ...["Available", "On Trip", "In Shop", "Retired"].map(s => ({ label: s, value: s }))
+              ]}
+              className="w-auto"
+            />
+            <Combobox
+              value={region}
+              onChange={setRegion}
+              options={[
+                { label: "All Regions", value: "" },
+                ...regions.map(r => ({ label: r, value: r }))
+              ]}
+              className="w-auto"
+            />
           </div>
         }
       />

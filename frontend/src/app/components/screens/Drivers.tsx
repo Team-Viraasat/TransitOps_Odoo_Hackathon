@@ -4,6 +4,7 @@ import { useStore } from "../../lib/store";
 import { canWrite } from "../../lib/rbac";
 import type { Driver, DriverStatus, LicenseCategory } from "../../lib/types";
 import { Button, Field, Input, Select, Panel, PageHeader, StatusBadge, Modal, EmptyState } from "../ui/primitives";
+import { Combobox } from "../ui/combobox";
 
 const CATEGORIES: LicenseCategory[] = ["LMV", "HMV", "Transport", "Other"];
 const STATUSES: DriverStatus[] = ["Available", "On Trip", "Off Duty", "Suspended"];
@@ -51,14 +52,24 @@ export function Drivers({ globalSearch }: { globalSearch: string }) {
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-to-muted" />
             <Input value={local} onChange={(e) => setLocal(e.target.value)} placeholder="Search name or license" className="pl-9" />
           </div>
-          <Select value={status} onChange={(e) => setStatus(e.target.value)} className="w-auto">
-            <option value="">All Statuses</option>
-            {STATUSES.map((s) => <option key={s}>{s}</option>)}
-          </Select>
-          <Select value={cat} onChange={(e) => setCat(e.target.value)} className="w-auto">
-            <option value="">All Categories</option>
-            {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
-          </Select>
+          <Combobox
+            value={status}
+            onChange={setStatus}
+            options={[
+              { label: "All Statuses", value: "" },
+              ...STATUSES.map(s => ({ label: s, value: s }))
+            ]}
+            className="w-auto"
+          />
+          <Combobox
+            value={cat}
+            onChange={setCat}
+            options={[
+              { label: "All Categories", value: "" },
+              ...CATEGORIES.map(c => ({ label: c, value: c }))
+            ]}
+            className="w-auto"
+          />
         </div>
       </Panel>
 
@@ -113,14 +124,13 @@ export function Drivers({ globalSearch }: { globalSearch: string }) {
                       {writable && (
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-2">
-                            <Select
+                            <Combobox
                               value={d.status}
-                              onChange={(e) => setDriverStatus(d.id, e.target.value as DriverStatus)}
-                              className="w-auto py-1 text-xs"
+                              onChange={(v) => setDriverStatus(d.id, v as DriverStatus)}
+                              className="w-32 py-1 text-xs"
                               disabled={d.status === "On Trip"}
-                            >
-                              {STATUSES.map((s) => <option key={s} value={s} disabled={s === "On Trip"}>{s}</option>)}
-                            </Select>
+                              options={STATUSES.filter(s => s !== "On Trip" || d.status === "On Trip").map(s => ({ label: s, value: s }))}
+                            />
                             <button onClick={() => { setEditing(d); setShowForm(true); }} className="rounded p-1.5 text-to-muted hover:bg-to-panel2 hover:text-to-blue">
                               <Pencil size={15} />
                             </button>
@@ -182,9 +192,11 @@ function DriverForm({
         <Field label="Name"><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>
         <Field label="License Number"><Input value={lic} onChange={(e) => setLic(e.target.value.toUpperCase())} /></Field>
         <Field label="License Category">
-          <Select value={cat} onChange={(e) => setCat(e.target.value as LicenseCategory)}>
-            {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
-          </Select>
+          <Combobox
+            value={cat}
+            onChange={(v) => setCat(v as LicenseCategory)}
+            options={CATEGORIES.map(c => ({ label: c, value: c }))}
+          />
         </Field>
         <Field label="License Expiry"><Input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></Field>
         <Field label="Contact Number"><Input value={contact} onChange={(e) => setContact(e.target.value)} /></Field>

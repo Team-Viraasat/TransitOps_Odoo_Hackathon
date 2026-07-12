@@ -3,6 +3,7 @@ import { Truck, Sun, Moon } from "lucide-react";
 import { useStore } from "../../lib/store";
 import { Button, Field, Input } from "../ui/primitives";
 import { seedUsers } from "../../lib/seed";
+import { Typewriter } from "../ui/typewriter-text";
 
 export function Auth() {
   const { login, theme, toggleTheme } = useStore();
@@ -39,9 +40,13 @@ export function Auth() {
     }, 2000);
   };
 
+  const imageSrc = "https://res.cloudinary.com/dvasr5a1s/image/upload/v1783850738/8c64974c1e58d27458d88a535d586404_onxroq.jpg";
+  const quoteText = "Welcome Back! The journey continues.";
+  const quoteAuthor = "TransitOps";
+
   return (
-    <div className="relative flex min-h-screen w-full items-center justify-center bg-to-bg p-4 text-to-text overflow-hidden">
-      {/* Dynamic Keyframe Injection */}
+    <div className="w-full min-h-screen md:grid md:grid-cols-2 bg-to-bg text-to-text overflow-hidden relative">
+      {/* Dynamic Keyframe Injection for the truck transition */}
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes truckDrive {
           0% {
@@ -78,66 +83,58 @@ export function Auth() {
       {/* Floating Theme Toggle */}
       <button
         onClick={toggleTheme}
-        className="absolute top-4 right-4 z-50 flex size-10 items-center justify-center rounded-lg border border-to-border bg-to-panel text-to-text hover:bg-to-panel2 transition-colors cursor-pointer"
+        className="absolute top-4 right-4 z-50 flex size-10 items-center justify-center rounded-lg border border-to-border bg-to-panel text-to-text hover:bg-to-panel2 transition-colors cursor-pointer shadow-lg"
         title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
       >
         {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
       </button>
 
-      {/* Centered Sign In Card */}
-      <div className={`w-full max-w-md rounded-2xl border border-to-border bg-to-panel p-8 shadow-xl space-y-6 transition-all duration-500 ${isTransitioning ? "blur-md scale-95 opacity-50 pointer-events-none" : ""}`}>
-        
-        {/* Brand Identity */}
-        <div className="flex flex-col items-center text-center space-y-2">
-          <img src="/logo.png" alt="TransitOps Logo" className="h-16 w-auto object-contain" />
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-to-text">TransitOps</h1>
-            <p className="text-xs text-to-muted">Smart Transport Operations Platform</p>
-          </div>
-        </div>
-
-        {/* Welcome Section */}
-        <div className="text-center space-y-1">
-          <h2 className="text-lg font-semibold">Welcome back</h2>
-          <p className="text-xs text-to-muted">Sign in to coordinate fleets, dispatch cargo, and track metrics.</p>
-        </div>
-
-        {/* Sign In Form */}
-        <form onSubmit={submit} className="space-y-4">
-          <Field label="Email Address">
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@transitops.local" />
-          </Field>
-          <Field label="Password">
-            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
-          </Field>
-
-          {error && <div className="rounded-lg border border-to-red/30 bg-to-red/10 px-3 py-2 text-xs text-to-red">{error}</div>}
-
-          <div className="flex items-center justify-between text-xs text-to-muted">
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="accent-to-orange rounded" />
-              Remember this device
-            </label>
-            <a className="text-to-blue hover:underline" href="#" onClick={(e) => e.preventDefault()}>
-              Reset password
-            </a>
+      {/* Left Column: Form */}
+      <div className={`flex h-screen flex-col items-center justify-center p-6 md:h-auto md:p-0 md:py-12 transition-all duration-500 ${isTransitioning ? "blur-md scale-95 opacity-50 pointer-events-none" : ""}`}>
+        <div className="mx-auto grid w-[350px] gap-6">
+          
+          <div className="flex flex-col items-center text-center space-y-2">
+            <img src="/logo.png" alt="TransitOps Logo" className="h-12 w-auto object-contain" />
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-to-text">Welcome back</h1>
+              <p className="text-balance text-sm text-to-muted mt-1">Sign in to coordinate fleets, dispatch cargo, and track metrics</p>
+            </div>
           </div>
 
-          <Button type="submit" variant="primary" className="w-full py-2.5 font-semibold mt-2">
-            Sign In
-          </Button>
-        </form>
+          <form onSubmit={submit} className="grid gap-4">
+            <Field label="Email Address">
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@transitops.local" required />
+            </Field>
+            <Field label="Password">
+              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
+            </Field>
 
-        {/* Sandbox Profiles Grid */}
-        <div className="border-t border-to-border pt-5 space-y-3">
-          <div className="text-center">
-            <span className="text-[11px] font-semibold text-to-muted uppercase tracking-wider">Demo Access Profiles</span>
+            {error && <div className="rounded-lg border border-to-red/30 bg-to-red/10 px-3 py-2 text-xs text-to-red">{error}</div>}
+
+            <div className="flex items-center justify-between text-xs text-to-muted">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="accent-to-orange rounded" />
+                Remember this device
+              </label>
+              <a className="text-to-blue hover:underline" href="#" onClick={(e) => e.preventDefault()}>
+                Reset password
+              </a>
+            </div>
+
+            <Button type="submit" variant="primary" className="w-full py-2.5 font-semibold mt-2">
+              Sign In
+            </Button>
+          </form>
+
+          <div className="relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t after:border-to-border mt-2">
+            <span className="relative z-10 bg-to-bg px-2 text-to-muted">Demo Access Profiles</span>
           </div>
           
           <div className="grid grid-cols-2 gap-2">
             {seedUsers.map((u) => (
               <button
                 key={u.id}
+                type="button"
                 onClick={() => {
                   setEmail(u.email);
                   setPassword("password123");
@@ -150,7 +147,29 @@ export function Auth() {
             ))}
           </div>
         </div>
+      </div>
 
+      {/* Right Column: Image and Quote */}
+      <div
+        className="hidden md:block relative bg-cover bg-center transition-all duration-500 ease-in-out"
+        style={{ backgroundImage: `url(${imageSrc})` }}
+      >
+        <div className="absolute inset-x-0 bottom-0 h-[150px] bg-gradient-to-t from-black/80 to-transparent" />
+        
+        <div className="relative z-10 flex h-full flex-col items-center justify-end p-6 pb-12">
+          <blockquote className="space-y-3 text-center text-white max-w-md">
+            <p className="text-xl font-medium leading-relaxed drop-shadow-md">
+              “<Typewriter
+                  key={quoteText}
+                  text={quoteText}
+                  speed={60}
+                />”
+            </p>
+            <cite className="block text-sm font-light text-white/80 not-italic drop-shadow-sm">
+                — {quoteAuthor}
+            </cite>
+          </blockquote>
+        </div>
       </div>
 
       {/* Transit Transition Blur Overlay */}
