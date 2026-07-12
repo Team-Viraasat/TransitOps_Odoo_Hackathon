@@ -1,8 +1,15 @@
 import React, { useState } from "react";
-import { Truck, Sun, Moon } from "lucide-react";
+import { Sun, Moon } from "lucide-react";
 import { useStore } from "../../lib/store";
 import { Button, Field, Input } from "../ui/primitives";
-import { seedUsers } from "../../lib/seed";
+
+const DEMO_PROFILES = [
+  { role: "Fleet Manager", name: "Priya Nair", email: "fleet@transitops.local" },
+  { role: "Dispatcher", name: "Arjun Mehta", email: "dispatch@transitops.local" },
+  { role: "Safety Officer", name: "Sana Kapoor", email: "safety@transitops.local" },
+  { role: "Financial Analyst", name: "Rahul Desai", email: "finance@transitops.local" },
+  { role: "Admin", name: "Admin", email: "admin@transitops.local" },
+];
 
 export function Auth() {
   const { login, theme, toggleTheme } = useStore();
@@ -22,20 +29,17 @@ export function Auth() {
       setError("Password is required.");
       return;
     }
-    
-    // Check credentials locally first before showing the animation
-    const u = seedUsers.find((x) => x.email.toLowerCase() === email.trim().toLowerCase());
-    if (!u || u.password !== password) {
-      setError("Invalid credentials. Please check the demo accounts.");
-      return;
-    }
-    
+
     setError("");
     setIsTransitioning(true);
-    
-    // Defer actual login state update for 2 seconds to let the transition animate
-    setTimeout(() => {
-      login(email, password);
+
+    // Defer actual login to let the transition animate
+    setTimeout(async () => {
+      const success = await login(email, password);
+      if (!success) {
+        setError("Sign in failed. Please check your credentials and try again.");
+        setIsTransitioning(false);
+      }
     }, 2000);
   };
 
@@ -44,24 +48,10 @@ export function Auth() {
       {/* Dynamic Keyframe Injection */}
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes truckDrive {
-          0% {
-            left: -120px;
-            opacity: 0;
-            transform: scale(0.9);
-          }
-          15% {
-            opacity: 1;
-            transform: scale(1);
-          }
-          85% {
-            opacity: 1;
-            transform: scale(1);
-          }
-          100% {
-            left: 100%;
-            opacity: 0;
-            transform: scale(0.9);
-          }
+          0% { left: -120px; opacity: 0; transform: scale(0.9); }
+          15% { opacity: 1; transform: scale(1); }
+          85% { opacity: 1; transform: scale(1); }
+          100% { left: 100%; opacity: 0; transform: scale(0.9); }
         }
         @keyframes fadeIn {
           from { opacity: 0; }
@@ -86,7 +76,7 @@ export function Auth() {
 
       {/* Centered Sign In Card */}
       <div className={`w-full max-w-md rounded-2xl border border-to-border bg-to-panel p-8 shadow-xl space-y-6 transition-all duration-500 ${isTransitioning ? "blur-md scale-95 opacity-50 pointer-events-none" : ""}`}>
-        
+
         {/* Brand Identity */}
         <div className="flex flex-col items-center text-center space-y-2">
           <img src="/logo.png" alt="TransitOps Logo" className="h-16 w-auto object-contain" />
@@ -133,11 +123,11 @@ export function Auth() {
           <div className="text-center">
             <span className="text-[11px] font-semibold text-to-muted uppercase tracking-wider">Demo Access Profiles</span>
           </div>
-          
+
           <div className="grid grid-cols-2 gap-2">
-            {seedUsers.map((u) => (
+            {DEMO_PROFILES.map((u) => (
               <button
-                key={u.id}
+                key={u.email}
                 onClick={() => {
                   setEmail(u.email);
                   setPassword("password123");
@@ -156,19 +146,19 @@ export function Auth() {
       {/* Transit Transition Blur Overlay */}
       {isTransitioning && (
         <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-to-bg/40 backdrop-blur-md animate-fade-in">
-          
+
           {/* Track segment */}
           <div className="relative w-full max-w-lg h-24 overflow-hidden flex items-end pb-3">
             {/* The Road track */}
             <div className="absolute bottom-4 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-to-muted/30 to-transparent" />
             <div className="absolute bottom-4 left-0 right-0 h-[3px] border-b border-dashed border-to-orange/30 w-full" />
-            
+
             {/* Moving Truck Icon */}
             <div className="absolute bottom-1 left-[-120px] animate-truck-drive text-to-orange">
-              <Truck size={44} className="stroke-[1.5]" />
+              <img src="/logo.png" alt="TransitOps" className="h-11 w-auto object-contain" />
             </div>
           </div>
-          
+
           {/* Dispatch Loading indicator */}
           <div className="mt-6 text-center space-y-1.5">
             <p className="text-sm font-semibold tracking-widest uppercase text-to-orange animate-pulse">Initializing Hub Dispatch Link</p>
