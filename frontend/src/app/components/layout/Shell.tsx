@@ -94,12 +94,6 @@ export function Shell({
           );
         })}
       </nav>
-      <div className="border-t border-to-border p-3">
-        <div className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs text-to-muted">
-          <ShieldCheck size={16} className="text-to-green" />
-          Role-based access active
-        </div>
-      </div>
     </>
   );
 
