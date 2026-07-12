@@ -163,9 +163,9 @@ export function Auth() {
             <div className="absolute bottom-4 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-to-muted/30 to-transparent" />
             <div className="absolute bottom-4 left-0 right-0 h-[3px] border-b border-dashed border-to-orange/30 w-full" />
             
-            {/* Moving Truck Logo */}
-            <div className="absolute bottom-1 left-[-120px] animate-truck-drive">
-              <img src="/logo.png" alt="TransitOps Truck" className="h-16 w-auto object-contain" />
+            {/* Moving Truck Icon */}
+            <div className="absolute bottom-1 left-[-120px] animate-truck-drive text-to-orange">
+              <Truck size={44} className="stroke-[1.5]" />
             </div>
           </div>
           
