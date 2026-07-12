@@ -66,11 +66,9 @@ export function Shell({
   const SidebarInner = (
     <>
       <div className="flex items-center gap-2.5 px-5 py-4">
-        <div className="flex size-8 items-center justify-center rounded-lg bg-to-orange text-black">
-          <Truck size={18} />
-        </div>
+        <img src="/logo.png" alt="TransitOps Logo" className="size-8 object-contain" />
         <div>
-          <div className="text-to-text">TransitOps</div>
+          <div className="text-to-text font-bold">TransitOps</div>
           <div className="text-[11px] text-to-muted">Smart Transport Ops</div>
         </div>
       </div>

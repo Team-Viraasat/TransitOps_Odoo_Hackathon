@@ -42,9 +42,7 @@ export function Auth() {
         
         {/* Brand Identity */}
         <div className="flex flex-col items-center text-center space-y-2">
-          <div className="flex size-12 items-center justify-center rounded-xl bg-to-orange text-black shadow-lg shadow-to-orange/20">
-            <Truck size={24} />
-          </div>
+          <img src="/logo.png" alt="TransitOps Logo" className="h-16 w-auto object-contain" />
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-to-text">TransitOps</h1>
             <p className="text-xs text-to-muted">Smart Transport Operations Platform</p>
