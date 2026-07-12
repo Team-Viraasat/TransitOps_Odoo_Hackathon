@@ -12,6 +12,8 @@ import {
   LogOut,
   Menu,
   ShieldCheck,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useStore } from "../../lib/store";
 import { canView, type ModuleKey } from "../../lib/rbac";
@@ -50,7 +52,7 @@ export function Shell({
   onSearch: (v: string) => void;
   children: React.ReactNode;
 }) {
-  const { currentUser, logout } = useStore();
+  const { currentUser, logout, theme, toggleTheme } = useStore();
   const [mobileOpen, setMobileOpen] = useState(false);
   const role = currentUser!.role;
   const visibleNav = NAV.filter((n) => canView(role, n.module));
@@ -137,7 +139,14 @@ export function Shell({
               <div className="text-[11px] leading-tight text-to-orange">{role}</div>
             </div>
             <div className="flex size-9 items-center justify-center rounded-full bg-to-blue/20 text-sm text-to-blue">{initials}</div>
-            <button onClick={logout} className="text-to-muted hover:text-to-red" title="Log out">
+            <button
+              onClick={toggleTheme}
+              className="text-to-muted hover:text-to-orange p-1.5 rounded-lg hover:bg-to-panel2 transition-colors cursor-pointer"
+              title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+            >
+              {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+            <button onClick={logout} className="text-to-muted hover:text-to-red p-1.5 rounded-lg hover:bg-to-panel2 transition-colors cursor-pointer" title="Log out">
               <LogOut size={18} />
             </button>
           </div>
