@@ -1,170 +1,109 @@
-import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcrypt";
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-async function main() {
-  console.log("🌱 Seeding TransitOps database...\n");
+const daysFromNow = (days: number) => {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
 
-  // ─── Roles ───────────────────────────────────────────
+async function main() {
+  await prisma.auditLog.deleteMany();
+  await prisma.expense.deleteMany();
+  await prisma.fuelLog.deleteMany();
+  await prisma.maintenanceLog.deleteMany();
+  await prisma.trip.deleteMany();
+  await prisma.driver.deleteMany();
+  await prisma.vehicle.deleteMany();
+  await prisma.user.deleteMany();
+  await prisma.role.deleteMany();
+  await prisma.setting.deleteMany();
+
   const roles = await Promise.all(
     [
-      { name: "Fleet_Manager" as const, description: "Manages fleet assets, vehicle lifecycle, and maintenance" },
-      { name: "Dispatcher" as const, description: "Creates and manages trips" },
-      { name: "Safety_Officer" as const, description: "Manages driver compliance and safety status" },
-      { name: "Financial_Analyst" as const, description: "Reviews costs, fuel, expenses, ROI, and analytics" },
-      { name: "Admin" as const, description: "Full system access including settings and RBAC" },
-    ].map((r) =>
-      prisma.role.upsert({
-        where: { name: r.name },
-        update: { description: r.description },
-        create: r,
-      })
-    )
+      ["Fleet Manager", "Manages fleet assets, lifecycle, and maintenance"],
+      ["Dispatcher", "Creates and manages trips"],
+      ["Safety Officer", "Manages driver compliance and safety"],
+      ["Financial Analyst", "Reviews cost, fuel, ROI, and exports"],
+      ["Admin", "Manages settings and RBAC"],
+    ].map(([name, description]) => prisma.role.create({ data: { name, description } })),
   );
-
-  const roleMap = Object.fromEntries(roles.map((r) => [r.name, r.id]));
-  console.log(`✅ Roles: ${roles.length}`);
-
-  // ─── Users ───────────────────────────────────────────
+  const roleByName = Object.fromEntries(roles.map((role) => [role.name, role]));
   const passwordHash = await bcrypt.hash("password123", 10);
 
-  const usersData = [
-    { name: "Rajesh Sharma", email: "fleet@transitops.local", roleId: roleMap.Fleet_Manager },
-    { name: "Priya Patel", email: "dispatch@transitops.local", roleId: roleMap.Dispatcher },
-    { name: "Amit Singh", email: "safety@transitops.local", roleId: roleMap.Safety_Officer },
-    { name: "Neha Gupta", email: "finance@transitops.local", roleId: roleMap.Financial_Analyst },
-    { name: "Vikram Admin", email: "admin@transitops.local", roleId: roleMap.Admin },
-  ];
+  await prisma.user.createMany({
+    data: [
+      { name: "Priya Nair", email: "fleet@transitops.local", passwordHash, roleId: roleByName["Fleet Manager"].id },
+      { name: "Arjun Mehta", email: "dispatch@transitops.local", passwordHash, roleId: roleByName.Dispatcher.id },
+      { name: "Sana Kapoor", email: "safety@transitops.local", passwordHash, roleId: roleByName["Safety Officer"].id },
+      { name: "Rahul Desai", email: "finance@transitops.local", passwordHash, roleId: roleByName["Financial Analyst"].id },
+      { name: "Admin", email: "admin@transitops.local", passwordHash, roleId: roleByName.Admin.id },
+    ],
+  });
 
-  const users = await Promise.all(
-    usersData.map((u) =>
-      prisma.user.upsert({
-        where: { email: u.email },
-        update: { name: u.name, passwordHash, roleId: u.roleId },
-        create: { ...u, passwordHash },
-      })
-    )
-  );
+  const dispatcher = await prisma.user.findUniqueOrThrow({ where: { email: "dispatch@transitops.local" } });
+  const fleetManager = await prisma.user.findUniqueOrThrow({ where: { email: "fleet@transitops.local" } });
 
-  const userMap = Object.fromEntries(users.map((u) => [u.email.split("@")[0], u.id]));
-  console.log(`✅ Users: ${users.length}`);
+  const v1 = await prisma.vehicle.create({ data: { registrationNumber: "MH12AB1001", nameModel: "Tata Ace Gold", type: "Mini", maxLoadKg: 750, odometerKm: 48200, acquisitionCost: 620000, region: "West", status: "Available" } });
+  const v2 = await prisma.vehicle.create({ data: { registrationNumber: "MH14CD2045", nameModel: "Ashok Leyland Dost", type: "Van", maxLoadKg: 1250, odometerKm: 91300, acquisitionCost: 890000, region: "West", status: "On Trip" } });
+  const v3 = await prisma.vehicle.create({ data: { registrationNumber: "DL01EF3300", nameModel: "Tata 407 LPT", type: "Truck", maxLoadKg: 2500, odometerKm: 152000, acquisitionCost: 1450000, region: "North", status: "In Shop" } });
+  const v4 = await prisma.vehicle.create({ data: { registrationNumber: "KA05GH4120", nameModel: "Eicher Pro 2049", type: "Truck", maxLoadKg: 4000, odometerKm: 63400, acquisitionCost: 1980000, region: "South", status: "Available" } });
+  await prisma.vehicle.create({ data: { registrationNumber: "TN09IJ5560", nameModel: "BharatBenz 1617", type: "Container", maxLoadKg: 9000, odometerKm: 210500, acquisitionCost: 3800000, region: "South", status: "Retired" } });
+  const v6 = await prisma.vehicle.create({ data: { registrationNumber: "GJ01KL6789", nameModel: "Mahindra Bolero Pik-Up", type: "Van", maxLoadKg: 1500, odometerKm: 33100, acquisitionCost: 940000, region: "West", status: "Available" } });
 
-  // ─── Vehicles ────────────────────────────────────────
-  const vehiclesData = [
-    { registrationNumber: "GJ-01-AB-1234", nameModel: "Tata Ace Gold", type: "Mini" as const, maxLoadKg: 750, odometerKm: 45200, acquisitionCost: 450000, region: "Gujarat", status: "Available" as const },
-    { registrationNumber: "MH-02-CD-5678", nameModel: "Ashok Leyland Dost+", type: "Truck" as const, maxLoadKg: 1500, odometerKm: 78500, acquisitionCost: 750000, region: "Maharashtra", status: "Available" as const },
-    { registrationNumber: "RJ-14-EF-9012", nameModel: "Mahindra Bolero Pickup", type: "Van" as const, maxLoadKg: 1250, odometerKm: 62100, acquisitionCost: 890000, region: "Rajasthan", status: "Available" as const },
-    { registrationNumber: "GJ-05-GH-3456", nameModel: "Eicher Pro 2049", type: "Truck" as const, maxLoadKg: 4900, odometerKm: 124300, acquisitionCost: 1650000, region: "Gujarat", status: "On_Trip" as const },
-    { registrationNumber: "MH-12-IJ-7890", nameModel: "Tata 407 Gold SFC", type: "Container" as const, maxLoadKg: 3500, odometerKm: 95800, acquisitionCost: 1250000, region: "Maharashtra", status: "In_Shop" as const },
-    { registrationNumber: "DL-08-KL-2345", nameModel: "Force Traveller 3350", type: "Van" as const, maxLoadKg: 1800, odometerKm: 156000, acquisitionCost: 1100000, region: "Delhi", status: "Retired" as const },
-    { registrationNumber: "GJ-03-MN-6789", nameModel: "BharatBenz 1217C", type: "Truck" as const, maxLoadKg: 8500, odometerKm: 210400, acquisitionCost: 2400000, region: "Gujarat", status: "Available" as const },
-    { registrationNumber: "KA-01-OP-1122", nameModel: "Tata Intra V30", type: "Mini" as const, maxLoadKg: 1100, odometerKm: 33700, acquisitionCost: 680000, region: "Karnataka", status: "Available" as const },
-  ];
+  const d1 = await prisma.driver.create({ data: { name: "Vikram Singh", licenseNumber: "MH-DL-77012", licenseCategory: "HMV", licenseExpiryDate: daysFromNow(420), contactNumber: "+91 98200 11223", safetyScore: 92, status: "Available" } });
+  const d2 = await prisma.driver.create({ data: { name: "Imran Sheikh", licenseNumber: "MH-DL-88234", licenseCategory: "Transport", licenseExpiryDate: daysFromNow(120), contactNumber: "+91 98330 44556", safetyScore: 84, status: "On Trip" } });
+  await prisma.driver.create({ data: { name: "Manoj Kumar", licenseNumber: "DL-DL-33110", licenseCategory: "HMV", licenseExpiryDate: daysFromNow(-15), contactNumber: "+91 99100 77889", safetyScore: 71, status: "Available" } });
+  await prisma.driver.create({ data: { name: "Suresh Rao", licenseNumber: "KA-DL-55221", licenseCategory: "LMV", licenseExpiryDate: daysFromNow(260), contactNumber: "+91 90080 22334", safetyScore: 58, status: "Suspended" } });
+  await prisma.driver.create({ data: { name: "Deepak Yadav", licenseNumber: "GJ-DL-66445", licenseCategory: "Transport", licenseExpiryDate: daysFromNow(75), contactNumber: "+91 97250 66778", safetyScore: 88, status: "Off Duty" } });
+  const d6 = await prisma.driver.create({ data: { name: "Ravi Pillai", licenseNumber: "TN-DL-99001", licenseCategory: "HMV", licenseExpiryDate: daysFromNow(540), contactNumber: "+91 94440 33221", safetyScore: 95, status: "Available" } });
 
-  const vehicles = await Promise.all(
-    vehiclesData.map((v) =>
-      prisma.vehicle.upsert({
-        where: { registrationNumber: v.registrationNumber },
-        update: { status: v.status, odometerKm: v.odometerKm },
-        create: v,
-      })
-    )
-  );
+  const t1 = await prisma.trip.create({ data: { tripCode: "TRP-1001", source: "Mumbai", destination: "Pune", vehicleId: v2.id, driverId: d2.id, cargoWeightKg: 1100, plannedDistanceKm: 150, startOdometerKm: 91300, revenue: 18000, status: "Dispatched", dispatchedAt: daysFromNow(-1), createdById: dispatcher.id, createdAt: daysFromNow(-1) } });
+  const t2 = await prisma.trip.create({ data: { tripCode: "TRP-1002", source: "Bengaluru", destination: "Chennai", vehicleId: v4.id, driverId: d6.id, cargoWeightKg: 3200, plannedDistanceKm: 350, actualDistanceKm: 358, startOdometerKm: 62000, finalOdometerKm: 62358, fuelConsumedLiters: 92, revenue: 42000, status: "Completed", completedAt: daysFromNow(-6), createdById: dispatcher.id, createdAt: daysFromNow(-6) } });
+  await prisma.trip.create({ data: { tripCode: "TRP-1003", source: "Ahmedabad", destination: "Surat", cargoWeightKg: 900, plannedDistanceKm: 265, revenue: 15000, status: "Draft", createdById: dispatcher.id } });
+  await prisma.trip.create({ data: { tripCode: "TRP-1004", source: "Delhi", destination: "Jaipur", cargoWeightKg: 2100, plannedDistanceKm: 280, revenue: 26000, status: "Cancelled", cancelReason: "Customer postponed shipment", cancelledAt: daysFromNow(-3), createdById: dispatcher.id, createdAt: daysFromNow(-3) } });
 
-  const vehMap = Object.fromEntries(vehicles.map((v) => [v.registrationNumber, v.id]));
-  console.log(`✅ Vehicles: ${vehicles.length}`);
+  await prisma.maintenanceLog.create({ data: { vehicleId: v3.id, serviceType: "Engine Overhaul", description: "Coolant leak and gasket replacement", cost: 42000, startDate: daysFromNow(-2), status: "Active", createdById: fleetManager.id } });
+  await prisma.maintenanceLog.create({ data: { vehicleId: v1.id, serviceType: "Tyre Replacement", description: "4 tyres rotated and replaced", cost: 28000, startDate: daysFromNow(-30), endDate: daysFromNow(-28), status: "Completed", createdById: fleetManager.id } });
+  await prisma.maintenanceLog.create({ data: { vehicleId: v4.id, serviceType: "Periodic Service", description: "Oil, filters, brakes inspection", cost: 9500, startDate: daysFromNow(-20), endDate: daysFromNow(-20), status: "Completed", createdById: fleetManager.id } });
 
-  // ─── Drivers ─────────────────────────────────────────
-  const driversData = [
-    { name: "Suresh Kumar", licenseNumber: "GJ01-2020-0045672", licenseCategory: "HMV" as const, licenseExpiryDate: new Date("2027-06-15"), contactNumber: "+91-9876543210", safetyScore: 92, status: "Available" as const },
-    { name: "Ramesh Yadav", licenseNumber: "MH02-2019-0098234", licenseCategory: "HMV" as const, licenseExpiryDate: new Date("2027-03-20"), contactNumber: "+91-9876543211", safetyScore: 87, status: "Available" as const },
-    { name: "Dinesh Prajapati", licenseNumber: "RJ14-2021-0034567", licenseCategory: "Transport" as const, licenseExpiryDate: new Date("2028-01-10"), contactNumber: "+91-9876543212", safetyScore: 95, status: "On_Trip" as const },
-    { name: "Mahesh Joshi", licenseNumber: "GJ05-2018-0076543", licenseCategory: "LMV" as const, licenseExpiryDate: new Date("2025-09-30"), contactNumber: "+91-9876543213", safetyScore: 78, status: "Off_Duty" as const },
-    { name: "Kamlesh Solanki", licenseNumber: "MH12-2022-0012345", licenseCategory: "HMV" as const, licenseExpiryDate: new Date("2028-11-05"), contactNumber: "+91-9876543214", safetyScore: 45, status: "Suspended" as const },
-    { name: "Prakash Meena", licenseNumber: "DL08-2017-0054321", licenseCategory: "Transport" as const, licenseExpiryDate: new Date("2025-02-28"), contactNumber: "+91-9876543215", safetyScore: 82, status: "Available" as const },
-  ];
+  await prisma.fuelLog.createMany({
+    data: [
+      { vehicleId: v4.id, tripId: t2.id, liters: 92, cost: 8740, logDate: daysFromNow(-6), odometerKm: 62358, createdById: dispatcher.id },
+      { vehicleId: v2.id, tripId: t1.id, liters: 40, cost: 3800, logDate: daysFromNow(-1), odometerKm: 91300, createdById: dispatcher.id },
+      { vehicleId: v1.id, liters: 25, cost: 2375, logDate: daysFromNow(-10), odometerKm: 48000, createdById: dispatcher.id },
+      { vehicleId: v6.id, liters: 30, cost: 2850, logDate: daysFromNow(-4), odometerKm: 33000, createdById: dispatcher.id },
+    ],
+  });
 
-  const drivers = await Promise.all(
-    driversData.map((d) =>
-      prisma.driver.upsert({
-        where: { licenseNumber: d.licenseNumber },
-        update: { status: d.status, safetyScore: d.safetyScore },
-        create: d,
-      })
-    )
-  );
+  await prisma.expense.createMany({
+    data: [
+      { tripId: t2.id, vehicleId: v4.id, type: "Toll", description: "NH44 toll plazas", amount: 1450, expenseDate: daysFromNow(-6), createdById: dispatcher.id },
+      { tripId: t1.id, vehicleId: v2.id, type: "Misc", description: "Loading labour charges", amount: 900, expenseDate: daysFromNow(-1), createdById: dispatcher.id },
+      { vehicleId: v6.id, type: "Maintenance", description: "Wiper and bulb replacement", amount: 650, expenseDate: daysFromNow(-4), createdById: dispatcher.id },
+    ],
+  });
 
-  const drvMap = Object.fromEntries(drivers.map((d) => [d.name.split(" ")[0], d.id]));
-  console.log(`✅ Drivers: ${drivers.length}`);
-
-  // ─── Trips ───────────────────────────────────────────
-  const dispatcherId = userMap["dispatch"];
-  const fleetUserId = userMap["fleet"];
-
-  const tripsData = [
-    { tripCode: "TR-2026-001", vehicleId: vehMap["GJ-01-AB-1234"], driverId: drvMap["Suresh"], source: "Ahmedabad", destination: "Surat", cargoWeightKg: 600, plannedDistanceKm: 265, actualDistanceKm: 272, startOdometerKm: 44800, finalOdometerKm: 45072, fuelConsumedLiters: 28.5, revenue: 18500, status: "Completed" as const, dispatchedAt: new Date("2026-07-08T06:00:00Z"), completedAt: new Date("2026-07-08T14:30:00Z"), createdById: dispatcherId },
-    { tripCode: "TR-2026-002", vehicleId: vehMap["MH-02-CD-5678"], driverId: drvMap["Ramesh"], source: "Mumbai", destination: "Pune", cargoWeightKg: 1200, plannedDistanceKm: 150, actualDistanceKm: 155, startOdometerKm: 78200, finalOdometerKm: 78355, fuelConsumedLiters: 22, revenue: 12000, status: "Completed" as const, dispatchedAt: new Date("2026-07-09T07:00:00Z"), completedAt: new Date("2026-07-09T12:00:00Z"), createdById: dispatcherId },
-    { tripCode: "TR-2026-003", vehicleId: vehMap["GJ-05-GH-3456"], driverId: drvMap["Dinesh"], source: "Rajkot", destination: "Jamnagar", cargoWeightKg: 3800, plannedDistanceKm: 100, status: "Dispatched" as const, dispatchedAt: new Date("2026-07-12T05:00:00Z"), createdById: dispatcherId },
-    { tripCode: "TR-2026-004", source: "Vadodara", destination: "Bharuch", cargoWeightKg: 900, plannedDistanceKm: 75, status: "Draft" as const, createdById: dispatcherId },
-    { tripCode: "TR-2026-005", vehicleId: vehMap["RJ-14-EF-9012"], driverId: drvMap["Suresh"], source: "Jaipur", destination: "Jodhpur", cargoWeightKg: 1000, plannedDistanceKm: 340, status: "Cancelled" as const, cancelReason: "Client cancelled order", cancelledAt: new Date("2026-07-10T10:00:00Z"), createdById: dispatcherId },
-  ];
-
-  const trips = await Promise.all(
-    tripsData.map((t) =>
-      prisma.trip.upsert({ where: { tripCode: t.tripCode }, update: { status: t.status }, create: t })
-    )
-  );
-
-  const tripMap = Object.fromEntries(trips.map((t) => [t.tripCode, t.id]));
-  console.log(`✅ Trips: ${trips.length}`);
-
-  // ─── Maintenance Logs ────────────────────────────────
-  const maintenanceCount = await prisma.maintenanceLog.count();
-  if (maintenanceCount === 0) {
-    await prisma.maintenanceLog.createMany({
-      data: [
-        { vehicleId: vehMap["MH-12-IJ-7890"], serviceType: "Engine Overhaul", description: "Full engine inspection and oil seal replacement", cost: 45000, startDate: new Date("2026-07-11T09:00:00Z"), status: "Active", createdById: fleetUserId },
-        { vehicleId: vehMap["GJ-01-AB-1234"], serviceType: "Brake Pad Replacement", description: "Front and rear brake pads replaced", cost: 8500, startDate: new Date("2026-06-20T08:00:00Z"), endDate: new Date("2026-06-21T16:00:00Z"), status: "Completed", createdById: fleetUserId },
-        { vehicleId: vehMap["MH-02-CD-5678"], serviceType: "Tyre Rotation", description: "All four tyres rotated and balanced", cost: 3200, startDate: new Date("2026-06-15T10:00:00Z"), endDate: new Date("2026-06-15T14:00:00Z"), status: "Completed", createdById: fleetUserId },
-      ],
-    });
-  }
-  console.log(`✅ Maintenance Logs: 3`);
-
-  // ─── Fuel Logs ───────────────────────────────────────
-  const fuelCount = await prisma.fuelLog.count();
-  if (fuelCount === 0) {
-    await prisma.fuelLog.createMany({
-      data: [
-        { vehicleId: vehMap["GJ-01-AB-1234"], tripId: tripMap["TR-2026-001"], liters: 28.5, cost: 2850, logDate: new Date("2026-07-08T06:30:00Z"), odometerKm: 44830, createdById: dispatcherId },
-        { vehicleId: vehMap["MH-02-CD-5678"], tripId: tripMap["TR-2026-002"], liters: 22, cost: 2200, logDate: new Date("2026-07-09T07:30:00Z"), odometerKm: 78230, createdById: dispatcherId },
-        { vehicleId: vehMap["GJ-05-GH-3456"], tripId: tripMap["TR-2026-003"], liters: 15, cost: 1500, logDate: new Date("2026-07-12T05:30:00Z"), odometerKm: 124350, createdById: dispatcherId },
-        { vehicleId: vehMap["GJ-03-MN-6789"], liters: 45, cost: 4500, logDate: new Date("2026-07-05T11:00:00Z"), odometerKm: 210000, createdById: fleetUserId },
-        { vehicleId: vehMap["KA-01-OP-1122"], liters: 20, cost: 2000, logDate: new Date("2026-07-06T09:00:00Z"), odometerKm: 33500, createdById: fleetUserId },
-      ],
-    });
-  }
-  console.log(`✅ Fuel Logs: 5`);
-
-  // ─── Expenses ────────────────────────────────────────
-  const expenseCount = await prisma.expense.count();
-  if (expenseCount === 0) {
-    await prisma.expense.createMany({
-      data: [
-        { tripId: tripMap["TR-2026-001"], vehicleId: vehMap["GJ-01-AB-1234"], type: "Toll", description: "Ahmedabad-Surat highway toll", amount: 450, expenseDate: new Date("2026-07-08T08:00:00Z"), createdById: dispatcherId },
-        { tripId: tripMap["TR-2026-002"], vehicleId: vehMap["MH-02-CD-5678"], type: "Toll", description: "Mumbai-Pune expressway toll", amount: 380, expenseDate: new Date("2026-07-09T08:00:00Z"), createdById: dispatcherId },
-        { tripId: tripMap["TR-2026-001"], vehicleId: vehMap["GJ-01-AB-1234"], type: "Misc", description: "Driver meals and parking", amount: 650, expenseDate: new Date("2026-07-08T12:00:00Z"), createdById: dispatcherId },
-        { vehicleId: vehMap["MH-12-IJ-7890"], type: "Maintenance", description: "Engine overhaul parts procurement", amount: 32000, expenseDate: new Date("2026-07-11T10:00:00Z"), createdById: fleetUserId },
-        { tripId: tripMap["TR-2026-003"], vehicleId: vehMap["GJ-05-GH-3456"], type: "Toll", description: "Rajkot-Jamnagar toll", amount: 200, expenseDate: new Date("2026-07-12T06:00:00Z"), createdById: dispatcherId },
-      ],
-    });
-  }
-  console.log(`✅ Expenses: 5`);
-
-  console.log("\n🎉 Seed complete!");
+  await prisma.setting.create({
+    data: {
+      id: 1,
+      depotName: "TransitOps Central Depot",
+      currency: "INR",
+      distanceUnit: "km",
+    },
+  });
 }
 
 main()
-  .catch((e) => { console.error("❌ Seed failed:", e); process.exit(1); })
-  .finally(async () => { await prisma.$disconnect(); });
+  .then(async () => {
+    await prisma.$disconnect();
+    console.log("Seeded TransitOps demo data");
+  })
+  .catch(async (error) => {
+    console.error(error);
+    await prisma.$disconnect();
+    process.exit(1);
+  });
