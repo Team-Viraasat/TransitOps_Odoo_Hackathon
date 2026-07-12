@@ -10,6 +10,7 @@ export function Auth() {
   const [password, setPassword] = useState("password123");
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState("");
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,13 +22,59 @@ export function Auth() {
       setError("Password is required.");
       return;
     }
-    const ok = login(email, password);
-    if (!ok) setError("Invalid credentials. Please check the demo accounts.");
-    else setError("");
+    
+    // Check credentials locally first before showing the animation
+    const u = seedUsers.find((x) => x.email.toLowerCase() === email.trim().toLowerCase());
+    if (!u || u.password !== password) {
+      setError("Invalid credentials. Please check the demo accounts.");
+      return;
+    }
+    
+    setError("");
+    setIsTransitioning(true);
+    
+    // Defer actual login state update for 2 seconds to let the transition animate
+    setTimeout(() => {
+      login(email, password);
+    }, 2000);
   };
 
   return (
-    <div className="relative flex min-h-screen w-full items-center justify-center bg-to-bg p-4 text-to-text">
+    <div className="relative flex min-h-screen w-full items-center justify-center bg-to-bg p-4 text-to-text overflow-hidden">
+      {/* Dynamic Keyframe Injection */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes truckDrive {
+          0% {
+            left: -120px;
+            opacity: 0;
+            transform: scale(0.9);
+          }
+          15% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          85% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          100% {
+            left: 100%;
+            opacity: 0;
+            transform: scale(0.9);
+          }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .animate-truck-drive {
+          animation: truckDrive 2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+        .animate-fade-in {
+          animation: fadeIn 0.3s ease-out forwards;
+        }
+      `}} />
+
       {/* Floating Theme Toggle */}
       <button
         onClick={toggleTheme}
@@ -38,13 +85,11 @@ export function Auth() {
       </button>
 
       {/* Centered Sign In Card */}
-      <div className="w-full max-w-md rounded-2xl border border-to-border bg-to-panel p-8 shadow-xl space-y-6">
+      <div className={`w-full max-w-md rounded-2xl border border-to-border bg-to-panel p-8 shadow-xl space-y-6 transition-all duration-500 ${isTransitioning ? "blur-md scale-95 opacity-50 pointer-events-none" : ""}`}>
         
         {/* Brand Identity */}
         <div className="flex flex-col items-center text-center space-y-2">
-          <div className="flex size-12 items-center justify-center rounded-xl bg-to-orange text-black shadow-lg shadow-to-orange/20">
-            <Truck size={24} />
-          </div>
+          <img src="/logo.png" alt="TransitOps Logo" className="h-16 w-auto object-contain" />
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-to-text">TransitOps</h1>
             <p className="text-xs text-to-muted">Smart Transport Operations Platform</p>
@@ -107,6 +152,30 @@ export function Auth() {
         </div>
 
       </div>
+
+      {/* Transit Transition Blur Overlay */}
+      {isTransitioning && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-to-bg/40 backdrop-blur-md animate-fade-in">
+          
+          {/* Track segment */}
+          <div className="relative w-full max-w-lg h-24 overflow-hidden flex items-end pb-3">
+            {/* The Road track */}
+            <div className="absolute bottom-4 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-to-muted/30 to-transparent" />
+            <div className="absolute bottom-4 left-0 right-0 h-[3px] border-b border-dashed border-to-orange/30 w-full" />
+            
+            {/* Moving Truck Icon */}
+            <div className="absolute bottom-1 left-[-120px] animate-truck-drive text-to-orange">
+              <Truck size={44} className="stroke-[1.5]" />
+            </div>
+          </div>
+          
+          {/* Dispatch Loading indicator */}
+          <div className="mt-6 text-center space-y-1.5">
+            <p className="text-sm font-semibold tracking-widest uppercase text-to-orange animate-pulse">Initializing Hub Dispatch Link</p>
+            <p className="text-xs text-to-muted">Loading secure console operations telemetry...</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
