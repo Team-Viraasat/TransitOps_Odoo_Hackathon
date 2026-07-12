@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type {
   User,
+  RoleName,
   Vehicle,
   Driver,
   Trip,
@@ -9,22 +10,9 @@ import type {
   FuelLog,
   Expense,
   Settings,
-  VehicleStatus,
   DriverStatus,
 } from "./types";
-import {
-  seedUsers,
-  seedVehicles,
-  seedDrivers,
-  seedTrips,
-  seedMaintenance,
-  seedFuelLogs,
-  seedExpenses,
-  seedSettings,
-} from "./seed";
-
-const uid = () => Math.random().toString(36).slice(2, 10);
-const today = () => new Date().toISOString().slice(0, 10);
+import { api } from "./api";
 
 interface StoreState {
   currentUser: User | null;
@@ -36,8 +24,9 @@ interface StoreState {
   fuelLogs: FuelLog[];
   expenses: Expense[];
   settings: Settings;
+  loading: boolean;
 
-  login: (email: string, password: string) => boolean;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
 
   addVehicle: (v: Omit<Vehicle, "id" | "status">) => void;
@@ -73,6 +62,18 @@ interface StoreState {
 }
 
 const StoreContext = createContext<StoreState | null>(null);
+const ALLOWED_USER_ROLES: ReadonlySet<RoleName> = new Set([
+  "Fleet Manager",
+  "Dispatcher",
+  "Safety Officer",
+  "Financial Analyst",
+  "Admin",
+]);
+const ALLOWED_USER_STATUSES: ReadonlySet<User["status"]> = new Set([
+  "Active",
+  "Locked",
+  "Disabled",
+]);
 
 export const useStore = () => {
   const ctx = useContext(StoreContext);
@@ -82,42 +83,92 @@ export const useStore = () => {
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [users] = useState<User[]>(seedUsers);
-  const [vehicles, setVehicles] = useState<Vehicle[]>(seedVehicles);
-  const [drivers, setDrivers] = useState<Driver[]>(seedDrivers);
-  const [trips, setTrips] = useState<Trip[]>(seedTrips);
-  const [maintenance, setMaintenance] = useState<MaintenanceLog[]>(seedMaintenance);
-  const [fuelLogs, setFuelLogs] = useState<FuelLog[]>(seedFuelLogs);
-  const [expenses, setExpenses] = useState<Expense[]>(seedExpenses);
-  const [settings, setSettings] = useState<Settings>(seedSettings);
-  const [tripCounter, setTripCounter] = useState(1005);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [maintenance, setMaintenance] = useState<MaintenanceLog[]>([]);
+  const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [settings, setSettings] = useState<Settings>({ depotName: "TransitOps", currency: "INR", distanceUnit: "km" });
+  const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     const local = localStorage.getItem("theme");
     if (local === "light" || local === "dark") return local;
     return "dark";
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
     const root = window.document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
+    if (theme === "dark") root.classList.add("dark");
+    else root.classList.remove("dark");
     localStorage.setItem("theme", theme);
   }, [theme]);
 
   const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
 
-  const setVehicleStatus = (id: string, status: VehicleStatus) =>
-    setVehicles((prev) => prev.map((v) => (v.id === id ? { ...v, status } : v)));
-  const setDriverStatusInternal = (id: string, status: DriverStatus) =>
-    setDrivers((prev) => prev.map((d) => (d.id === id ? { ...d, status } : d)));
+  // Map API user response to our User type
+  const mapUser = (u: { id: string; name: string; email: string; role: string; status: string }): User => {
+    if (!ALLOWED_USER_ROLES.has(u.role as RoleName) || !ALLOWED_USER_STATUSES.has(u.status as User["status"])) {
+      throw new Error("Invalid user role or status received from server.");
+    }
+    return {
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role as User["role"],
+      status: u.status as User["status"],
+    };
+  };
 
-  const api = useMemo<StoreState>(() => {
+  // Fetch all data from API
+  const fetchAll = useCallback(async () => {
+    try {
+      const [vRes, dRes, tRes, mRes, flRes, exRes, sRes] = await Promise.all([
+        api.vehicles.list(),
+        api.drivers.list(),
+        api.trips.list(),
+        api.maintenance.list(),
+        api.fuel.list(),
+        api.expenses.list(),
+        api.settings.get(),
+      ]);
+      setVehicles(vRes.items);
+      setDrivers(dRes.items);
+      setTrips(tRes.items);
+      setMaintenance(mRes.items);
+      setFuelLogs(flRes.items);
+      setExpenses(exRes.items);
+      setSettings(sRes.settings);
+    } catch (err) {
+      console.error("Failed to fetch data:", err);
+    }
+  }, []);
+
+  // Check auth on mount
+  useEffect(() => {
+    api.auth.me()
+      .then(({ user }) => {
+        setCurrentUser(mapUser(user));
+        return fetchAll();
+      })
+      .catch(() => {
+        setCurrentUser(null);
+        api.auth.logout();
+      })
+      .finally(() => setLoading(false));
+  }, [fetchAll]);
+
+  const storeApi = useMemo<StoreState>(() => {
+    const refetchVehicles = () => api.vehicles.list().then((r) => setVehicles(r.items)).catch(() => {});
+    const refetchDrivers = () => api.drivers.list().then((r) => setDrivers(r.items)).catch(() => {});
+    const refetchTrips = () => api.trips.list().then((r) => setTrips(r.items)).catch(() => {});
+    const refetchMaintenance = () => api.maintenance.list().then((r) => setMaintenance(r.items)).catch(() => {});
+    const refetchFuelLogs = () => api.fuel.list().then((r) => setFuelLogs(r.items)).catch(() => {});
+    const refetchExpenses = () => api.expenses.list().then((r) => setExpenses(r.items)).catch(() => {});
+
     return {
       currentUser,
-      users,
+      users: [],
       vehicles,
       drivers,
       trips,
@@ -125,242 +176,159 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       fuelLogs,
       expenses,
       settings,
+      loading,
       theme,
       toggleTheme,
 
-      login: (email, password) => {
-        const u = users.find((x) => x.email.toLowerCase() === email.trim().toLowerCase());
-        if (!u || u.password !== password) {
-          toast.error("Invalid credentials. Please try again.");
+      login: async (email, password) => {
+        try {
+          const { user } = await api.auth.login(email, password);
+          const mappedUser = mapUser(user);
+          setCurrentUser(mappedUser);
+          toast.success(`Welcome back, ${mappedUser.name}`);
+          await fetchAll();
+          return true;
+        } catch (err: any) {
+          setCurrentUser(null);
+          await api.auth.logout();
+          toast.error(err?.message || "Invalid credentials");
           return false;
         }
-        setCurrentUser(u);
-        toast.success(`Welcome back, ${u.name}`);
-        return true;
       },
-      logout: () => setCurrentUser(null),
 
+      logout: () => {
+        api.auth.logout().then(() => {
+          setCurrentUser(null);
+          toast.success("Logged out");
+        });
+      },
+
+      // ── Vehicles ────────────────────────────────
       addVehicle: (v) => {
-        const reg = v.registrationNumber.trim().toUpperCase();
-        if (vehicles.some((x) => x.registrationNumber === reg)) {
-          toast.error("Registration number must be unique.");
-          return;
-        }
-        setVehicles((prev) => [{ ...v, registrationNumber: reg, id: uid(), status: "Available" }, ...prev]);
-        toast.success("Vehicle added to registry.");
+        api.vehicles.create(v)
+          .then(() => { toast.success("Vehicle added to registry."); refetchVehicles(); })
+          .catch((err) => toast.error(err.message));
       },
       updateVehicle: (id, patch) => {
-        setVehicles((prev) => prev.map((v) => (v.id === id ? { ...v, ...patch } : v)));
-        toast.success("Vehicle updated.");
+        api.vehicles.update(id, patch)
+          .then(() => { toast.success("Vehicle updated."); refetchVehicles(); })
+          .catch((err) => toast.error(err.message));
       },
       retireVehicle: (id) => {
-        const v = vehicles.find((x) => x.id === id);
-        if (!v) return;
-        if (v.status === "On Trip") {
-          toast.error("Cannot retire a vehicle that is On Trip.");
-          return;
-        }
-        setVehicleStatus(id, "Retired");
-        toast.success(`${v.registrationNumber} retired.`);
+        api.vehicles.retire(id)
+          .then(() => { toast.success("Vehicle retired."); refetchVehicles(); })
+          .catch((err) => toast.error(err.message));
       },
 
+      // ── Drivers ─────────────────────────────────
       addDriver: (d) => {
-        const lic = d.licenseNumber.trim().toUpperCase();
-        if (drivers.some((x) => x.licenseNumber === lic)) {
-          toast.error("License number must be unique.");
-          return;
-        }
-        setDrivers((prev) => [{ ...d, licenseNumber: lic, id: uid(), status: "Available" }, ...prev]);
-        toast.success("Driver profile created.");
+        api.drivers.create(d)
+          .then(() => { toast.success("Driver profile created."); refetchDrivers(); })
+          .catch((err) => toast.error(err.message));
       },
       updateDriver: (id, patch) => {
-        setDrivers((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
-        toast.success("Driver updated.");
+        api.drivers.update(id, patch)
+          .then(() => { toast.success("Driver updated."); refetchDrivers(); })
+          .catch((err) => toast.error(err.message));
       },
       setDriverStatus: (id, status) => {
-        const d = drivers.find((x) => x.id === id);
-        if (!d) return;
-        if (d.status === "On Trip") {
-          toast.error("Driver is On Trip. Close the trip first.");
-          return;
-        }
-        setDriverStatusInternal(id, status);
-        toast.success(`${d.name} set to ${status}.`);
+        api.drivers.setStatus(id, status)
+          .then(() => { toast.success(`Driver set to ${status}.`); refetchDrivers(); })
+          .catch((err) => toast.error(err.message));
       },
 
+      // ── Trips ───────────────────────────────────
       addTrip: (t) => {
-        if (t.source.trim().toLowerCase() === t.destination.trim().toLowerCase()) {
-          toast.error("Source and destination cannot be identical.");
-          return;
-        }
-        if (t.cargoWeightKg <= 0 || t.plannedDistanceKm <= 0) {
-          toast.error("Cargo weight and distance must be positive.");
-          return;
-        }
-        const code = `TRP-${tripCounter}`;
-        setTripCounter((c) => c + 1);
-        setTrips((prev) => [
-          {
-            id: uid(),
-            tripCode: code,
-            source: t.source.trim(),
-            destination: t.destination.trim(),
-            vehicleId: t.vehicleId,
-            driverId: t.driverId,
-            cargoWeightKg: t.cargoWeightKg,
-            plannedDistanceKm: t.plannedDistanceKm,
-            actualDistanceKm: null,
-            startOdometerKm: null,
-            finalOdometerKm: null,
-            fuelConsumedLiters: null,
-            revenue: t.revenue,
-            status: "Draft",
-            createdAt: today(),
-          },
-          ...prev,
-        ]);
-        toast.success(`Draft trip ${code} created.`);
+        api.trips.create(t)
+          .then(() => { toast.success("Draft trip created."); refetchTrips(); })
+          .catch((err) => toast.error(err.message));
       },
-
       dispatchTrip: (id) => {
-        const trip = trips.find((t) => t.id === id);
-        if (!trip) return;
-        if (trip.status !== "Draft") {
-          toast.error("Only Draft trips can be dispatched.");
-          return;
-        }
-        const vehicle = vehicles.find((v) => v.id === trip.vehicleId);
-        const driver = drivers.find((d) => d.id === trip.driverId);
-        if (!vehicle || !driver) {
-          toast.error("Assign an available vehicle and driver first.");
-          return;
-        }
-        if (vehicle.status !== "Available") {
-          toast.error(`Vehicle ${vehicle.registrationNumber} is ${vehicle.status}.`);
-          return;
-        }
-        if (driver.status !== "Available") {
-          toast.error(`Driver ${driver.name} is ${driver.status}.`);
-          return;
-        }
-        if (new Date(driver.licenseExpiryDate) < new Date(today())) {
-          toast.error(`Driver ${driver.name} has an expired license.`);
-          return;
-        }
-        if (trip.cargoWeightKg > vehicle.maxLoadKg) {
-          toast.error(`Cargo ${trip.cargoWeightKg}kg exceeds capacity ${vehicle.maxLoadKg}kg.`);
-          return;
-        }
-        // transaction
-        setTrips((prev) => prev.map((t) => (t.id === id ? { ...t, status: "Dispatched", startOdometerKm: vehicle.odometerKm } : t)));
-        setVehicleStatus(vehicle.id, "On Trip");
-        setDriverStatusInternal(driver.id, "On Trip");
-        toast.success("Trip dispatched. Vehicle and driver marked On Trip.");
+        api.trips.dispatch(id)
+          .then(() => {
+            toast.success("Trip dispatched. Vehicle and driver marked On Trip.");
+            refetchTrips();
+            refetchVehicles();
+            refetchDrivers();
+          })
+          .catch((err) => toast.error(err.message));
       },
-
       completeTrip: (id, data) => {
-        const trip = trips.find((t) => t.id === id);
-        if (!trip || trip.status !== "Dispatched") {
-          toast.error("Only dispatched trips can be completed.");
-          return;
-        }
-        setTrips((prev) =>
-          prev.map((t) =>
-            t.id === id
-              ? {
-                  ...t,
-                  status: "Completed",
-                  finalOdometerKm: data.finalOdometerKm,
-                  actualDistanceKm: data.actualDistanceKm,
-                  fuelConsumedLiters: data.fuelConsumedLiters,
-                  revenue: data.revenue,
-                }
-              : t
-          )
-        );
-        if (trip.vehicleId) {
-          setVehicles((prev) =>
-            prev.map((v) => (v.id === trip.vehicleId ? { ...v, status: "Available", odometerKm: data.finalOdometerKm } : v))
-          );
-        }
-        if (trip.driverId) setDriverStatusInternal(trip.driverId, "Available");
-        if (trip.vehicleId && data.fuelConsumedLiters > 0) {
-          setFuelLogs((prev) => [
-            { id: uid(), vehicleId: trip.vehicleId!, tripId: trip.id, liters: data.fuelConsumedLiters, cost: Math.round(data.fuelConsumedLiters * 95), logDate: today(), odometerKm: data.finalOdometerKm },
-            ...prev,
-          ]);
-        }
-        toast.success("Trip completed. Vehicle and driver restored to Available.");
+        api.trips.complete(id, data)
+          .then(() => {
+            toast.success("Trip completed. Vehicle and driver restored to Available.");
+            refetchTrips();
+            refetchVehicles();
+            refetchDrivers();
+            refetchFuelLogs();
+          })
+          .catch((err) => toast.error(err.message));
       },
-
       cancelTrip: (id, reason) => {
-        const trip = trips.find((t) => t.id === id);
-        if (!trip || (trip.status !== "Draft" && trip.status !== "Dispatched")) {
-          toast.error("Only Draft or Dispatched trips can be cancelled.");
-          return;
-        }
-        setTrips((prev) => prev.map((t) => (t.id === id ? { ...t, status: "Cancelled", cancelReason: reason } : t)));
-        if (trip.status === "Dispatched") {
-          if (trip.vehicleId) setVehicleStatus(trip.vehicleId, "Available");
-          if (trip.driverId) setDriverStatusInternal(trip.driverId, "Available");
-        }
-        toast.success("Trip cancelled. Resources restored.");
+        api.trips.cancel(id, reason)
+          .then(() => {
+            toast.success("Trip cancelled. Resources restored.");
+            refetchTrips();
+            refetchVehicles();
+            refetchDrivers();
+          })
+          .catch((err) => toast.error(err.message));
       },
 
+      // ── Maintenance ─────────────────────────────
       addMaintenance: (m) => {
-        const v = vehicles.find((x) => x.id === m.vehicleId);
-        if (!v) return;
-        if (v.status === "Retired") {
-          toast.error("Cannot service a retired vehicle.");
-          return;
-        }
-        if (v.status === "On Trip") {
-          toast.error("Vehicle is On Trip. Complete the trip first.");
-          return;
-        }
-        if (maintenance.some((x) => x.vehicleId === m.vehicleId && x.status === "Active")) {
-          toast.error("An active maintenance record already exists for this vehicle.");
-          return;
-        }
-        setMaintenance((prev) => [
-          { id: uid(), vehicleId: m.vehicleId, serviceType: m.serviceType, description: m.description, cost: m.cost, startDate: today(), endDate: null, status: "Active" },
-          ...prev,
-        ]);
-        setVehicleStatus(m.vehicleId, "In Shop");
-        toast.success(`${v.registrationNumber} moved to In Shop.`);
+        api.maintenance.create({ ...m, startDate: new Date().toISOString().slice(0, 10) })
+          .then(() => {
+            toast.success("Maintenance started. Vehicle moved to In Shop.");
+            refetchMaintenance();
+            refetchVehicles();
+          })
+          .catch((err) => toast.error(err.message));
       },
       closeMaintenance: (id) => {
-        const rec = maintenance.find((x) => x.id === id);
-        if (!rec || rec.status === "Completed") return;
-        setMaintenance((prev) => prev.map((x) => (x.id === id ? { ...x, status: "Completed", endDate: today() } : x)));
-        const v = vehicles.find((x) => x.id === rec.vehicleId);
-        if (v && v.status !== "Retired") setVehicleStatus(rec.vehicleId, "Available");
-        toast.success("Maintenance closed.");
+        api.maintenance.close(id)
+          .then(() => {
+            toast.success("Maintenance closed.");
+            refetchMaintenance();
+            refetchVehicles();
+          })
+          .catch((err) => toast.error(err.message));
       },
 
+      // ── Fuel & Expenses ─────────────────────────
       addFuelLog: (f) => {
-        if (f.liters <= 0 || f.cost < 0) {
-          toast.error("Liters must be positive and cost non-negative.");
-          return;
-        }
-        setFuelLogs((prev) => [{ ...f, id: uid() }, ...prev]);
-        toast.success("Fuel log recorded.");
+        api.fuel.create(f)
+          .then(() => { toast.success("Fuel log recorded."); refetchFuelLogs(); })
+          .catch((err) => toast.error(err.message));
       },
       addExpense: (e) => {
-        if (e.amount < 0) {
-          toast.error("Amount must be non-negative.");
-          return;
-        }
-        setExpenses((prev) => [{ ...e, id: uid() }, ...prev]);
-        toast.success("Expense recorded.");
+        api.expenses.create(e)
+          .then(() => { toast.success("Expense recorded."); refetchExpenses(); })
+          .catch((err) => toast.error(err.message));
       },
 
+      // ── Settings ────────────────────────────────
       updateSettings: (s) => {
-        setSettings((prev) => ({ ...prev, ...s }));
-        toast.success("Settings saved.");
+        api.settings.update(s)
+          .then((res) => {
+            setSettings(res.settings);
+            toast.success("Settings saved.");
+          })
+          .catch((err) => toast.error(err.message));
       },
     };
-  }, [currentUser, users, vehicles, drivers, trips, maintenance, fuelLogs, expenses, settings, tripCounter, theme]);
+  }, [currentUser, vehicles, drivers, trips, maintenance, fuelLogs, expenses, settings, loading, theme, fetchAll]);
 
-  return <StoreContext.Provider value={api}>{children}</StoreContext.Provider>;
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-to-bg text-to-text">
+        <div className="text-center space-y-2">
+          <div className="animate-spin h-8 w-8 border-2 border-to-orange border-t-transparent rounded-full mx-auto" />
+          <p className="text-sm text-to-muted">Loading TransitOps...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <StoreContext.Provider value={storeApi}>{children}</StoreContext.Provider>;
 }
